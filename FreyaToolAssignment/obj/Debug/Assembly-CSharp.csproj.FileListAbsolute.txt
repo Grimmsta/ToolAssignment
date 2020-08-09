@@ -1,0 +1,2 @@
+C:\Users\Grimm.Svenkerud\Documents\Unity Projects\ToolAssignment\FreyaToolAssignment\obj\Debug\Assembly-CSharp.csprojAssemblyReference.cache
+C:\Users\Grimm.Svenkerud\Documents\Unity Projects\ToolAssignment\FreyaToolAssignment\obj\Debug\Assembly-CSharp.csproj.CoreCompileInputs.cache
