@@ -1,82 +1,77 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
-public class WaypointEditor : EditorWindow
+[CustomEditor(typeof(Waypoint))]
+public class WaypointEditor : Editor
 {
-    [MenuItem("Tools/WaypointManagerTool")]
-    public static void OpenUpManagerWindow()
-    {
-        GetWindow<WaypointEditor>("Waypoint Manager");
-    }
-
-    public List<Vector3> waypointList = new List<Vector3>();
-    SerializedObject so;
-    SerializedProperty propWaypointSize;
+    SerializedProperty propWaypoint;
+    List<Vector3> indexList = new List<Vector3>();
+    List<GameObject> activeAIAgentsList = new List<GameObject>();
     GameObject aiAgent;
-    bool aiAgentIsActive = false;
-
-    [Tooltip("Loops between all points if true, goes from A -> B and B -> A  if false")]
-    public bool loop = true;
+    int spawnIndex = 0;
 
     private void OnEnable()
     {
-        so = new SerializedObject(this);
-        propWaypointSize = so.FindProperty("waypointList");
+        propWaypoint = serializedObject.FindProperty("waypointList");
         SceneView.duringSceneGui += DuringSceneGUI;
     }
 
     private void OnDisable()
     {
         SceneView.duringSceneGui -= DuringSceneGUI;
-        for (int i = 0; i < waypointList.Count; i++)
-        {
-            waypointList.Clear();
-        }
-        aiAgent = null;
-        aiAgentIsActive = false;
     }
 
-    private void OnGUI()
+    public override void OnInspectorGUI()
     {
         GUILayout.Label("Waypoint route handler", EditorStyles.boldLabel);
 
-        so.Update();
-        EditorGUILayout.PropertyField(propWaypointSize);
-        so.ApplyModifiedProperties();
+        EditorGUILayout.PropertyField(propWaypoint);
+        serializedObject.ApplyModifiedProperties();
 
-        if (GUILayout.Button("Create waypoint route"))
+        if (GUILayout.Button("Add waypoint"))
         {
-            if (waypointList.Count != waypointList.Count)
-            {
-                for (int i = 0; i < waypointList.Count; i++)
-                {
-                    waypointList.Add(new Vector3());
-                }
-            }
+            propWaypoint.InsertArrayElementAtIndex(propWaypoint.arraySize);
+            serializedObject.ApplyModifiedProperties();
+        }
+
+        if (GUILayout.Button("Clear waypoint route"))
+        {
+            propWaypoint.ClearArray();
+            serializedObject.ApplyModifiedProperties();
         }
 
         GUILayout.Space(7);
         GUILayout.Label("AI Handler", EditorStyles.boldLabel);
+        GUILayout.Space(5);
+        GUILayout.Label("AI Spawning", EditorStyles.boldLabel);
+        EditorGUILayout.IntField("Number of active agents", activeAIAgentsList.Count);
         aiAgent = EditorGUILayout.ObjectField("AI Agent: ", aiAgent, typeof(GameObject), true) as GameObject;
+        spawnIndex = EditorGUILayout.IntField("At Element", spawnIndex);
+        serializedObject.ApplyModifiedProperties();
+        serializedObject.Update();
 
         if (GUILayout.Button("Instantiate AI"))
         {
-            if (waypointList.Count > 0)
+            if (propWaypoint.arraySize > 0)
             {
                 if (aiAgent == null)
                 {
                     EditorUtility.DisplayDialog("AI Handler", "There is no AI prefab chosen, please apply an AI prefab to the AI Agent object field", "OK");
                 }
-                else if (aiAgentIsActive)
+                else if (spawnIndex >= propWaypoint.arraySize || spawnIndex < 0)
                 {
-                    EditorUtility.DisplayDialog("AI Handler", "There is already an active agent in the scene", "OK");
+                    EditorUtility.DisplayDialog("AI Handler", "Element is out of range, make sure you have the waypoint element in your list", "OK");
+                }
+                else if (indexList != null && indexList.Contains(propWaypoint.GetArrayElementAtIndex(spawnIndex).vector3Value))
+                {
+                    EditorUtility.DisplayDialog("AI Handler", "There is already an active agent on this position, check so there aren't two waypoints at the same place. Or clear all active AIs", "OK");
                 }
                 else
                 {
-                    Instantiate(aiAgent, waypointList.First(), Quaternion.identity);
-                    aiAgentIsActive = true;
+                    Instantiate(aiAgent, propWaypoint.GetArrayElementAtIndex(spawnIndex).vector3Value, Quaternion.identity);
+                    indexList.Add(propWaypoint.GetArrayElementAtIndex(spawnIndex).vector3Value);
+                    activeAIAgentsList.Add(aiAgent);
                 }
             }
             else
@@ -85,30 +80,33 @@ public class WaypointEditor : EditorWindow
             }
         }
 
-        if (GUILayout.Button("Delete AI"))
+        serializedObject.ApplyModifiedProperties();
+
+        GUILayout.Space(10);
+        GUILayout.Label("AI De-spawning", EditorStyles.boldLabel);
+       
+        if (GUILayout.Button("Clear all active AIs"))
         {
-            aiAgent = null;
-            aiAgentIsActive = false;
+            EditorUtility.DisplayDialog("AI Handler", "The AI has been removed, remember to delete them from the hierarchy", "OK");
+            activeAIAgentsList.Clear();
+            indexList.Clear();
         }
+
+        serializedObject.Update();
+        serializedObject.ApplyModifiedProperties();
     }
 
     private void DuringSceneGUI(SceneView view)
     {
-        so.Update();
-        for (int i = 0; i < propWaypointSize.arraySize; i++)
+
+        for (int i = 0; i < propWaypoint.arraySize; i++)
         {
-            SerializedProperty prop = propWaypointSize.GetArrayElementAtIndex(i);
+            SerializedProperty prop = propWaypoint.GetArrayElementAtIndex(i);
             prop.vector3Value = Handles.PositionHandle(prop.vector3Value, Quaternion.identity);
 
-            if (loop)
-            {
-                Handles.DrawAAPolyLine(waypointList[i], waypointList[(int)Mathf.Repeat(i + 1, waypointList.Count)]);
-            }
-            else
-            {
-                Handles.DrawAAPolyLine(waypointList[i], waypointList[i + 1]);
-            }
+            Handles.DrawAAPolyLine(propWaypoint.GetArrayElementAtIndex(i).vector3Value, propWaypoint.GetArrayElementAtIndex((int)Mathf.Repeat(i + 1, propWaypoint.arraySize)).vector3Value);
+
         }
-        so.ApplyModifiedProperties();
+        serializedObject.ApplyModifiedProperties();
     }
 }
